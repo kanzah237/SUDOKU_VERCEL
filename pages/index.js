@@ -135,6 +135,56 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
+  const handleNumInput = (num) => {
+    if (done || !selected) return;
+    const [r, c] = selected;
+    if (puzzle[r][c] !== 0) return;
+
+    if (num === 0) {
+      // Clear cell
+      const newGrid = deepClone(grid);
+      newGrid[r][c] = 0;
+      setGrid(newGrid);
+      const key = `${r},${c}`;
+      const newWrong = new Set(wrong); newWrong.delete(key);
+      const newCorrect = new Set(correct); newCorrect.delete(key);
+      setWrong(newWrong); setCorrect(newCorrect);
+      return;
+    }
+
+    if (!running) setRunning(true);
+    const key = `${r},${c}`;
+    const newGrid = deepClone(grid);
+    newGrid[r][c] = num;
+    setGrid(newGrid);
+
+    const newWrong = new Set(wrong);
+    const newCorrect = new Set(correct);
+
+    if (num === solution[r][c]) {
+      newWrong.delete(key);
+      newCorrect.add(key);
+    } else {
+      newCorrect.delete(key);
+      newWrong.add(key);
+      setMistakes(m => m + 1);
+    }
+    setWrong(newWrong);
+    setCorrect(newCorrect);
+
+    if (isComplete(newGrid, solution)) {
+      setDone(true);
+      setRunning(false);
+      const stored = localStorage.getItem(getBestKey(diff, puzzleIdx));
+      const prev = stored ? parseInt(stored) : null;
+      if (!prev || time < prev) {
+        localStorage.setItem(getBestKey(diff, puzzleIdx), time);
+        setBest(time);
+        setNewBest(true);
+      }
+    }
+  };
+
   const handleHint = () => {
     if (done || !solution) return;
     if (!running) setRunning(true);
@@ -267,6 +317,19 @@ export default function Home() {
           }))}
         </div>
 
+        {/* Number Pad for mobile */}
+        <div style={styles.numpad}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(n => (
+            <button 
+              key={n} 
+              style={styles.numBtn} 
+              onClick={() => handleNumInput(n)}
+            >
+              {n === 0 ? '✕' : n}
+            </button>
+          ))}
+        </div>
+
         {/* Controls */}
         <div style={styles.row}>
           <button style={styles.btn} onClick={handleHint}>💡 Hint</button>
@@ -310,54 +373,72 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '24px 16px 48px',
+    padding: '16px 8px 48px',
     userSelect: 'none',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 24,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 16,
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
-  title: { color: '#f1f5f9', fontSize: 28, fontWeight: 800, margin: 0 },
-  meta: { display: 'flex', gap: 8 },
+  title: { color: '#f1f5f9', fontSize: 22, fontWeight: 800, margin: 0 },
+  meta: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
   chip: {
     background: '#1e293b', color: '#cbd5e1', borderRadius: 8,
-    padding: '4px 10px', fontSize: 14, fontWeight: 600,
+    padding: '4px 8px', fontSize: 12, fontWeight: 600,
   },
-  row: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', justifyContent: 'center' },
+  row: { display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', justifyContent: 'center' },
   btn: {
     background: '#1e293b', color: '#94a3b8', border: '1px solid #334155',
-    borderRadius: 8, padding: '7px 16px', cursor: 'pointer', fontSize: 14,
+    borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
     fontWeight: 600, transition: 'all .15s',
   },
   btnActive: { background: '#4338ca', color: '#fff', borderColor: '#4338ca' },
   board: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(9, 48px)',
-    gridTemplateRows: 'repeat(9, 48px)',
+    gridTemplateColumns: 'repeat(9, 1fr)',
+    gridTemplateRows: 'repeat(9, 1fr)',
     border: '2px solid #475569',
     borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 12,
     outline: 'none',
+    width: 'min(90vw, 400px)',
+    height: 'min(90vw, 400px)',
+    maxWidth: '400px',
+    maxHeight: '400px',
   },
   cell: {
-    width: 48, height: 48,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', fontSize: 18, transition: 'background .1s',
+    cursor: 'pointer', fontSize: 'clamp(14px, 4vw, 18px)', transition: 'background .1s',
     borderTop: 'none', borderLeft: 'none',
+    aspectRatio: '1',
+  },
+  numpad: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: 6,
+    width: 'min(90vw, 300px)',
+    marginBottom: 12,
+  },
+  numBtn: {
+    background: '#1e293b', color: '#94a3b8', border: '1px solid #334155',
+    borderRadius: 8, padding: '12px 0', cursor: 'pointer', fontSize: 18,
+    fontWeight: 600, transition: 'all .15s',
   },
   modal: {
     position: 'fixed', inset: 0,
     background: 'rgba(0,0,0,.7)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 100,
+    padding: 16,
   },
   modalBox: {
-    background: '#1e293b', borderRadius: 16, padding: '32px 40px',
+    background: '#1e293b', borderRadius: 16, padding: '24px 32px',
     textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,.5)',
+    maxWidth: '90vw',
   },
 };
